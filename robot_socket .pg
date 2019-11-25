@@ -1,0 +1,114 @@
+.PROGRAM main（）     ；通讯主程序
+       ;声明变量
+       port=49152            
+         max_length=255
+       tout_open=60
+       tout_rec=60
+       CALL open_socket       ；连接通信
+       IF sock_id <0 THEN     ;套接字号小于0，代表socket通信未建立
+            GOTO exit_end   
+       END
+	   tout=60
+	   $sdata[1]="001"
+	   eret=0
+	   rret=0
+	 
+	   CALL  send(eret,.$data)    
+	   IF  eret<0 THEN
+		    PRINT "CODE 001 ERROR CODE code=",eret
+		    GOTO exit
+	   END
+	   CALL recv   
+	   IF  rret<0 THEN
+		    PRINT "CODE 001 ERROR CODE code=",rret
+		    GOTO exit
+	   END
+	   eret=0
+	   rret=0
+	   $sdata[1]="002"
+	   CALL  send(eret,.$data)    
+	   IF  eret<0 THEN
+		    PRINT "CODE 001 ERROR CODE code=",eret
+		    GOTO exit
+	   END
+	   CALL recv   
+	   IF  rret<0 THEN
+		    PRINT "CODE 001 ERROR CODE code=",rret
+		    GOTO exit
+	   END
+exit：
+       CALL close_socket     ;断开通讯
+exit_end:
+ 
+.END
+.PROGRAM open_socket()   ;开始通信
+         er_count=0
+ listen:
+       TCP_LISTEN retl,port
+       IF retl<0 THEN
+           IF er_count>=5 THEN 
+               PRINT "不能与PC连接（listen），停止程序。"
+               sock_id =-1
+               goto  exit
+           ELSE 
+                er_count=er_count+1
+                PRINT "TCP_LISTEN error =",retl,   " error count=", er_count
+                GOTO listen
+            END
+       ELSE
+             PRINT "TCP_LISTEN OK",retl  
+       END
+er_count=0
+ accept:
+       TCP_ACCEPT sock_id,port, tout_open,ip[1]
+       IF sock_id<0 THEN  
+           IF er_count>=5 THEN 
+                PRINT "不能与PC连接（listen），停止程序。"
+                TCP_END_LISTEN ret，port
+                sock_id=-1
+				goto exit
+           ELSE 
+                er_count=er_count+1
+                PRINT "TCP_ACCEPT error id=",sock_id,   " error count=", er_count
+                goto accept
+           END
+       ELSE
+                PRINT "TCP_ACCEPT OK id=",sock_id
+       END
+  exit:
+.END
+.PROGRAM send(.ret,.$data)    ;通讯  发送数据
+.$send_buf[1]=$data
+buf_n=1
+.ret=1
+  TCP_SEND sret，sock_id，.$send_buf[1]，buf_n，tout
+       IF sret<0 THEN
+            PRINT "TCP_SEND ERROR in SEND",sret 
+            .ret =-1
+       ELSE
+            PRINT "TCP_SEND OK in SEND",sret 
+       END
+.END
+
+.PROGRAM recv()     ;通讯 接收数据
+
+
+.num=0
+TCP_RECV rret，sock_id，$recv_buf[1]，.num，tout,max_length
+   IF rret<0 THEN  ;如果返回值变量小于0,则接收数据失败
+            PRINT "TCP_RECV ERROR in RECV",rret 
+            $recv_buf[1]="000"
+   ELSE
+           IF .num>0 THEN  ;如果接收的数据数组个数少于0，返回$recv_buf[1]="000"
+			   PRINT "TCP_RECV OK in RECV",rret 
+		   ELSE
+			   $recv_buf[1]="000"
+           END			
+   END
+.END
+.PROGRAM close_socket()  ;断开通讯
+  TCP_CLOSE ret,sock_id  ;通讯套接字关闭
+  IF ret<0 THEN
+    PRINT "TCP_CLOSE error ERROR=(",ret,")",$ERROR(ret)
+	
+.END
